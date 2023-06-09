@@ -1,0 +1,75 @@
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaConnect
+metadata:
+  name: mongodb-sink-connect-cluster
+  annotations:
+    strimzi.io/use-connector-resources: "true"
+  labels:  
+    strimzi.io/cluster: kafka-demo
+  namespace: demo
+spec:
+  tracing:
+    type: opentelemetry
+  template:
+    connectContainer:
+      env:
+        - name: OTEL_SERVICE_NAME
+          value: kafka-connect-mongodb
+        - name: OTEL_EXPORTER_OTLP_ENDPOINT
+          value: http://otel-collector-headless.app-monitor.svc:4317
+          #value: "jaeger-collector-headless.app-monitor.svc:4317"
+  config:
+    group.id: connect-cluster
+    key.converter: org.apache.kafka.connect.json.JsonConverter
+    value.converter: org.apache.kafka.connect.json.JsonConverter
+    key.converter.schemas.enable: false
+    value.converter.schemas.enable: false
+    offset.storage.topic: connect-offsets
+    config.storage.topic: connect-configs
+    status.storage.topic: connect-status
+    # group.id: connect-cluster
+    # offset.storage.topic: connect-cluster-offsets
+    # config.storage.topic: connect-cluster-configs
+    # status.storage.topic: connect-cluster-status
+    config.storage.replication.factor: 3
+    offset.storage.replication.factor: 3
+    status.storage.replication.factor: 3
+  metricsConfig:
+    valueFrom:
+      configMapKeyRef:
+        key: metrics-config.yml
+        name: connect-metrics
+    type: jmxPrometheusExporter
+  build:
+    output:
+      # type: docker
+      # image: quay.io/voravitl/kafka-connect-mongodb:latest
+      # pushSecret: quayio
+      type: imagestream
+      image: kafka-connect-mongodb:latest
+    plugins:
+      - name: my-plugin
+        artifacts:
+          - type: maven
+            repository: https://repo1.maven.org/maven2
+            group: org.mongodb.kafka
+            artifact: mongo-kafka-connect
+            version: 1.8.1
+  tls:
+    trustedCertificates:
+      - secretName: kafka-demo-cluster-ca-cert
+        certificate: ca.crt
+  logging:
+    type: inline
+    loggers:
+      log4j.rootLogger: "INFO"
+  readinessProbe: 
+    initialDelaySeconds: 15
+    timeoutSeconds: 5
+  livenessProbe:
+    initialDelaySeconds: 15
+    timeoutSeconds: 5
+  version: 3.4.0
+  replicas: 1
+  bootstrapServers: 'kafka-demo-kafka-bootstrap.demo.svc:9093'
+

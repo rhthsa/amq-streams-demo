@@ -1,0 +1,14 @@
+apiVersion: jaegertracing.io/v1
+kind: "Jaeger"
+metadata:
+  name: "jaeger"
+spec:
+  strategy: allInOne
+  # allInOne:
+  #   image: jaegertracing/all-in-one
+  #   options:
+  #     log-level: debug
+  storage:
+    options:
+      memory:
+        max-traces: 100000

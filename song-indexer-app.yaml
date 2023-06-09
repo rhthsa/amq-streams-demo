@@ -1,0 +1,90 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: song-indexer
+    app.kubernetes.io/component: song-indexer
+    app.kubernetes.io/instance: song-indexer
+    app.kubernetes.io/name: song-indexer
+    app.kubernetes.io/part-of: song-app
+    app.openshift.io/runtime: quarkus
+    app.openshift.io/runtime-version: "3.0.3.Final"
+  name: song-indexer
+  namespace: song-app
+spec:
+  progressDeadlineSeconds: 600
+  revisionHistoryLimit: 5
+  selector:
+    matchLabels:
+      app: song-indexer
+  strategy: 
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: song-indexer
+        version: v1
+        maistra.io/expose-route: 'true'
+      annotations:
+        sidecar.istio.io/inject: "false"
+        sidecar.istio.io/rewriteAppHTTPProbers: "false"
+    spec:
+      containers:
+      - name: song-indexer
+        image: quay.io/voravitl/song-indexer:v1
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+          protocol: TCP
+        resources:
+          requests:
+            cpu: "0.05"
+            memory: 100Mi
+          limits:
+            cpu: "0.2"
+            memory: 400Mi
+        env:
+        - name: quarkus.http.access-log.enabled
+          value: "true"
+        - name: quarkus.log.level
+          value: INFO
+        - name: quarkus.http.cors
+          value: "true"
+        - name: mp.messaging.incoming.songs.bootstrap.servers
+          value: KAFKA_BOOTSTRAP
+        - name: quarkus.otel.exporter.otlp.traces.endpoint
+          value: http://OTEL_ENDPOINT
+        readinessProbe:
+          httpGet:
+            path: /q/health/ready
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 300
+        livenessProbe:
+          httpGet:
+            path: /q/health/live
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 600
+        securityContext:
+          seccompProfile: #"RuntimeDefault" or "Localhost"
+            type: RuntimeDefault
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          capabilities:
+            drop: ["ALL"]
+          readOnlyRootFilesystem: false
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      tolerations:
+      - effect: NoExecute
+        key: node.kubernetes.io/unreachable
+        operator: Exists
+        tolerationSeconds: 60
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      terminationGracePeriodSeconds: 30
