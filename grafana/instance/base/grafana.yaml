@@ -4,7 +4,6 @@ metadata:
   name: grafana
   labels:
     app: grafana
-  namespace: app-monitor
 spec:
   config:
     security:

@@ -3,7 +3,7 @@ kind: Subscription
 metadata:
   labels:
     operators.coreos.com/opentelemetry-product.openshift-operators: ""
-  name: opentelemetry-product
+  name: opentelemetry
   namespace: openshift-operators
 spec:
   channel: stable
