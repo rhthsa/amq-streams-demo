@@ -34,7 +34,7 @@ spec:
     spec:
       containers:
       - name: song-indexer
-        image: quay.io/voravitl/song-indexer:v1
+        image: quay.io/voravitl/song-indexer:otel
         imagePullPolicy: Always
         ports:
         - containerPort: 8080

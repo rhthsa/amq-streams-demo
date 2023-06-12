@@ -1,10 +1,19 @@
+apiVersion: operators.coreos.com/v1
+kind: OperatorGroup
+metadata:
+  name: grafana-operator
+  namespace: PROJECT
+spec:
+  targetNamespaces:
+  - PROJECT
+---
 apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
 metadata:
   labels:
     operators.coreos.com/grafana-operator.app-monitor: ""
   name: grafana-operator
-  namespace: app-monitor
+  namespace: PROJECT
 spec:
   channel: v4
   installPlanApproval: Automatic

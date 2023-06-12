@@ -10,8 +10,7 @@ kind: Kafka
 metadata:
   name: kafka-demo
   labels:
-    strimzi.io/cluster=demo-cluster: kafka-demo
-
+    strimzi.io/cluster: kafka-demo
   namespace: demo
 spec:
   kafka:

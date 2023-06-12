@@ -39,7 +39,7 @@ spec:
     spec:
       containers:
       - name: song
-        image: quay.io/voravitl/song:v1
+        image: quay.io/voravitl/song:otel
         imagePullPolicy: Always
         ports:
         - containerPort: 8080
