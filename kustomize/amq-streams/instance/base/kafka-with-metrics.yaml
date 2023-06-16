@@ -5,7 +5,6 @@ metadata:
   name: kafka-demo
   labels:
     strimzi.io/cluster: kafka-demo
-  namespace: demo
   annotations:
     argocd.argoproj.io/hook: Sync
     argocd.argoproj.io/sync-wave: "100"
@@ -17,7 +16,6 @@ spec:
       transaction.state.log.min.isr: 2
       default.replication.factor: 3
       min.insync.replicas: 2
-
     jmxOptions:
       authentication:
         type: password

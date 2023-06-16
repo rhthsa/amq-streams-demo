@@ -13,7 +13,7 @@ spec:  # You need to replace PROJECT with namespace/project name
 
     exporters:
       jaeger:
-        endpoint: jaeger-collector-headless.PROJECT.svc:14250
+        endpoint: jaeger-collector-headless.app-monitor.svc:14250
         tls:
           ca_file: "/var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt"
           insecure: true

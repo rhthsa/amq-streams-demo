@@ -4,7 +4,10 @@ metadata:
   name: song-indexer
   namespace: song-app
   labels:
-    app: song
+    app: song-indexer
+  annotations:
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/sync-wave: "200"
 spec:
   ports:
   - name: http

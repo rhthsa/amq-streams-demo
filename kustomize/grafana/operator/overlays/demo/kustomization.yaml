@@ -5,15 +5,15 @@ namespace: app-monitor
 resources:
   - ../../base
 patches:
-  - patch: |-
-      - op: replace 
-        path: /spec/installPlanApproval
-        value: 'Manual'
-    target:
-      group: operators.coreos.com
-      kind: Subscription
-      name: grafana-operator
-      version: v1alpha1
+  # - patch: |-
+  #     - op: replace 
+  #       path: /spec/installPlanApproval
+  #       value: 'Manual'
+  #   target:
+  #     group: operators.coreos.com
+  #     kind: Subscription
+  #     name: grafana-operator
+  #     version: v1alpha1
   - patch: |-
       - op: replace 
         path: /spec/targetNamespaces/0

@@ -1,22 +1,26 @@
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
+  name: song
+  namespace: demo
   labels:
-    app: song-indexer
-    app.kubernetes.io/component: song-indexer
-    app.kubernetes.io/instance: song-indexer
-    app.kubernetes.io/name: song-indexer
-    app.kubernetes.io/part-of: song-app
+    app: song
+    app.kubernetes.io/component: song
+    app.kubernetes.io/instance: song
+    app.kubernetes.io/name: song
+    app.kubernetes.io/part-of: music-streaming-app
     app.openshift.io/runtime: quarkus
     app.openshift.io/runtime-version: "3.0.3.Final"
-  name: song-indexer
-  namespace: song-app
+  annotations:
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/sync-wave: "100"
 spec:
   progressDeadlineSeconds: 600
   revisionHistoryLimit: 5
   selector:
     matchLabels:
-      app: song-indexer
+      app: song
   strategy: 
     rollingUpdate:
       maxSurge: 25%
@@ -25,7 +29,7 @@ spec:
   template:
     metadata:
       labels:
-        app: song-indexer
+        app: song
         version: v1
         maistra.io/expose-route: 'true'
       annotations:
@@ -33,8 +37,8 @@ spec:
         sidecar.istio.io/rewriteAppHTTPProbers: "false"
     spec:
       containers:
-      - name: song-indexer
-        image: quay.io/voravitl/song-indexer:otel
+      - name: song
+        image: quay.io/voravitl/song:otel
         imagePullPolicy: Always
         ports:
         - containerPort: 8080
@@ -46,17 +50,20 @@ spec:
           limits:
             cpu: "0.2"
             memory: 400Mi
-        env:
-        - name: quarkus.http.access-log.enabled
-          value: "true"
-        - name: quarkus.log.level
-          value: INFO
-        - name: quarkus.http.cors
-          value: "true"
-        - name: mp.messaging.incoming.songs.bootstrap.servers
-          value: KAFKA_BOOTSTRAP
-        - name: quarkus.otel.exporter.otlp.traces.endpoint
-          value: http://OTEL_ENDPOINT
+        envFrom:
+          - configMapRef:
+              name: song-config
+        # env:
+        # - name: quarkus.http.access-log.enabled
+        #   value: "true"
+        # - name: quarkus.log.level
+        #   value: INFO
+        # - name: quarkus.http.cors
+        #   value: "true"
+        # - name: mp.messaging.outgoing.songs.bootstrap.servers
+        #   value: KAFKA_BOOTSTRAP
+        # - name: quarkus.otel.exporter.otlp.traces.endpoint
+        #   value: http://OTEL_ENDPOINT
         readinessProbe:
           httpGet:
             path: /q/health/ready

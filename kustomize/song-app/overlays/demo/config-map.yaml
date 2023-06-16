@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: song-config-demo
+data:
+  quarkus.http.access-log.enabled: '"true"'
+  quarkus.log.level: INFO
+  quarkus.http.cors: '"true"'
+  mp.messaging.outgoing.songs.bootstrap.servers: 'kafka-demo-kafka-bootstrap.demo.svc:9092'
+  quarkus.otel.exporter.otlp.traces.endpoint: 'http://otel-collector-headless.app-monitor.svc:4317'
+immutable: false

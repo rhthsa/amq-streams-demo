@@ -4,6 +4,9 @@ metadata:
   name: connector-mongodb-sink
   labels:
     strimzi.io/cluster: mongodb-sink-connect-cluster
+  annotations:
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/sync-wave: "200"
 spec:
   class: com.mongodb.kafka.connect.MongoSinkConnector
   tasksMax: 3

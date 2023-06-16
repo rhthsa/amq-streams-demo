@@ -4,6 +4,9 @@ metadata:
   name: connect-metrics
   labels:
     app: strimzi
+  annotations:
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/sync-wave: "100"
 data:
   metrics-config.yml: |
     # Inspired by kafka-connect rules

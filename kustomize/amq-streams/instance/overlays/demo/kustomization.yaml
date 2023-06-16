@@ -4,13 +4,9 @@ kind: Kustomization
 namespace: demo
 resources:
   - ../../base
-  - kafka-topic.yaml
-  - kafka-service-monitor.yaml
+  - songs-topic.yaml
 patches:
   - patch: |-
-      - op: replace
-        path: /metadata/namespace
-        value: 'demo'
       - op: replace
         path: /spec/zookeeper/storage/size
         value: '10Gi'
@@ -18,7 +14,7 @@ patches:
         path: /spec/kafka/storage/size
         value: '10Gi'
     target:
-      kind: Kafka
       group: kafka.strimzi.io
+      kind: Kafka
       name: kafka-demo
       version: v1beta2
