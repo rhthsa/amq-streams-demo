@@ -15,7 +15,7 @@ spec:
     key.converter: org.apache.kafka.connect.storage.StringConverter
     value.converter: org.apache.kafka.connect.json.JsonConverter
     value.converter.schemas.enable: false
-    connection.uri: mongodb://mongodb.song-app.svc:27017
+    connection.uri: mongodb://mongodb.music-streaming-app.svc:27017
     database: sampledb
     collection: samples
     # transforms: rename

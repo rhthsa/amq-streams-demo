@@ -415,7 +415,7 @@ opentelemetry-operator.v0.74.0-5     Red Hat OpenShift distributed tracing data 
   ```bash
   helm repo add bitnami https://charts.bitnami.com/bitnami
 
-  helm install mongodb bitnami/mongodb --set podSecurityContext.fsGroup="",containerSecurityContext.enabled=false,podSecurityContext.enabled=false,auth.enabled=false --version 13.6.0 -n song-app
+  helm install mongodb bitnami/mongodb --set podSecurityContext.fsGroup="",containerSecurityContext.enabled=false,podSecurityContext.enabled=false,auth.enabled=false --version 13.6.0 -n demo
   ```
 
 <!-- - Create secret for image registry if you want to use external container registry
@@ -459,7 +459,7 @@ opentelemetry-operator.v0.74.0-5     Red Hat OpenShift distributed tracing data 
   - Create Kafka connector
     
     ```bash
-    oc create -f kafka-connect.yaml
+    oc create -k kustomize/kafka-connect-mongodb/connect/overlays/demo
     ```
 
   - Check builder log
@@ -500,7 +500,7 @@ opentelemetry-operator.v0.74.0-5     Red Hat OpenShift distributed tracing data 
   - Create sink connector
     
     ```bash
-    oc create -f kafka-connector.yaml
+    oc create -k  kustomize/kafka-connect-mongodb/connector/overlays/demo
     ```
 
   - Check kafa connect pod's log
