@@ -11,14 +11,14 @@ patches:
         path: /spec/template/spec/containers/0/envFrom/0
         value:
           configMapRef:
-            name: song-indexer-config-demo
+            name: song-config-demo
     target:
       kind: Deployment
-      name: song-indexer
+      name: song
   - patch: |-
       - op: replace
         path: /spec/template/spec/containers/0/image
-        value: quay.io/voravitl/song-indexer:native
+        value: quay.io/voravitl/song:native-otel
     target:
       kind: Deployment
-      name: song-indexer
+      name: song

@@ -2,17 +2,22 @@
 - [AMQ Sterams on OpenShift](#amq-sterams-on-openshift)
   - [Install AMQ Streams Operators](#install-amq-streams-operators)
   - [Create Kafka Cluster](#create-kafka-cluster)
-  - [Config user workload monitoring](#config-user-workload-monitoring)
-  - [Grafana Dashboard](#grafana-dashboard)
-  - [OpenTelemetry](#opentelemetry)
   - [Demo Application](#demo-application)
-  - [Kafka Connect](#kafka-connect)
+  - [Observability](#observability)
+    - [OpenTelemetry](#opentelemetry)
+      - [Install and configure Jager and OTEL](#install-and-configure-jager-and-otel)
+      - [Deploy app with OTEL enabled](#deploy-app-with-otel-enabled)
+      - [Jaeger Console](#jaeger-console)
+    - [Config user workload monitoring](#config-user-workload-monitoring)
+    - [Grafana Dashboard](#grafana-dashboard)
+  - [Kafka Connect MongoDB](#kafka-connect-mongodb)
 
 ## Install AMQ Streams Operators
 - Install AMQ Streams Operator
   
   ```bash
   oc apply -k kustomize/amq-streams/operator/overlays/demo
+  oc wait -n demo --timeout=180s --for=jsonpath='{.status.phase}'=Succeeded csv --all
   oc wait -n demo --for condition=established --timeout=180s \
     crd/kafkas.kafka.strimzi.io \
     crd/kafkatopics.kafka.strimzi.io \
@@ -26,6 +31,7 @@
   namespace/demo created
   operatorgroup.operators.coreos.com/amq-streams-operator created
   subscription.operators.coreos.com/amq-streams created
+  clusterserviceversion.operators.coreos.com/amqstreams.v2.4.0-0 condition met
   customresourcedefinition.apiextensions.k8s.io/kafkas.kafka.strimzi.io condition met
   customresourcedefinition.apiextensions.k8s.io/kafkatopics.kafka.strimzi.io condition met
   customresourcedefinition.apiextensions.k8s.io/strimzipodsets.core.strimzi.io condition met
@@ -40,6 +46,8 @@
   oc apply -k kustomize/amq-streams/instance/overlays/demo
   oc -n demo wait --for condition=ready \
      --timeout=180s pod -l  app.kubernetes.io/instance=kafka-demo
+  oc -n demo wait --for condition=ready \
+  --timeout=180s pod  -l rht.subcomp=kafka-broker
   oc get strimzipodsets -n demo
   ```
 
@@ -54,6 +62,9 @@
   pod/kafka-demo-zookeeper-0 condition met
   pod/kafka-demo-zookeeper-1 condition met
   pod/kafka-demo-zookeeper-2 condition met
+  pod/kafka-demo-kafka-0 condition met
+  pod/kafka-demo-kafka-1 condition met
+  pod/kafka-demo-kafka-2 condition met
   NAME                   PODS   READY PODS   CURRENT PODS   AGE
   kafka-demo-kafka       3      3            3              57s
   kafka-demo-zookeeper   3      3            3              102
@@ -72,7 +83,221 @@
   kafka-demo-kafka-exporter-d65ffddd8-wjcfk   1/1     Running   0          87s
   ```
 
-## Config user workload monitoring
+## Demo Application
+
+- Deploy song app (producer) and song-indexer (consumer) app
+  
+  ```bash
+  oc apply -k kustomize/song-app/overlays/demo
+  oc apply -k kustomize/song-indexer-app/overlays/demo 
+  oc -n music-streaming-app wait --for condition=ready \
+  --timeout=180s pod  -l app=song
+  oc -n music-streaming-app wait --for condition=ready \
+  --timeout=180s pod  -l app=song-indexer
+  oc get po -n music-streaming-app
+  ```
+  
+  Output
+
+  ```bash
+  pod/song-74c7f659dc-r5lsk condition met
+  pod/song-indexer-7ccbcfc455-hcl6l condition met
+  NAME                          READY   STATUS    RESTARTS   AGE
+  song-74c7f659dc-r5lsk          1/1     Running   0          5m37s
+  song-indexer-7ccbcfc455-hcl6l   1/1     Running   0          3m1s
+  ```
+  <!-- ```bash
+  KAFKA_BOOTSTRAP=kafka-demo-kafka-bootstrap.demo.svc:9092
+  OTEL_ENDPOINT=otel-collector-headless.app-monitor.svc:4317
+  cat song-app.yaml | \
+   sed 's/KAFKA_BOOTSTRAP/'$KAFKA_BOOTSTRAP'/' | \
+   sed 's/OTEL_ENDPOINT/'$OTEL_ENDPOINT'/' |
+   oc apply -f -
+  ``` -->
+
+- Check developer console
+  
+  ![](images/dev-console-song-app-topology.png)
+
+- Run following test scripts and check for both song app and song-indexer app
+  - Put a message to topic song
+    
+    ```bash
+    HOST=$(oc get route/song -n music-streaming-app -o jsonpath='{.spec.host}')
+    curl -X POST -v -H "Content-Type: application/json" -d '{"author":"Matt Bellamy","name":"Uprising","op":"ADD"}' https://$HOST/songs
+    ```
+
+    Output
+
+    ```bash
+    * TLSv1.3 (IN), TLS handshake, Newsession Ticket (4):
+    * TLSv1.3 (IN), TLS handshake, Newsession Ticket (4):
+    * old SSL session ID is stale, removing
+    < HTTP/1.1 204 No Content
+    < set-cookie: 307fcbf9d775aa21dec85f890f2422aa=8a021535774164c578aa4aeb3b12af98; path=/; HttpOnly; Secure; SameSite=None
+    <
+    * Connection #0 to host song-music-streaming-app.apps.cluster-2j5j5.2j5j5.sandbox1138.opentlc.com left intact
+    ```
+    
+    Remark: HTTP response code is 204.
+  <!-- - Test script
+  
+    ```bash
+    HOST=$(oc get route/song -n song-app -o jsonpath='{.spec.host}')
+    MAX=100
+    CUR=0
+    DELAY_SEC=1
+    while [ $CUR  -lt $MAX ];
+    do
+      curl -X POST -H "Content-Type: application/json" -d '{"author":"Matt Bellamy","name":"Uprising","op":"ADD"}' http://$HOST/songs
+      sleep $DELAY_SEC
+      CUR=$(expr $CUR + 1)
+      echo "Count :$CUR"
+    done
+    ``` -->
+  - song-app log
+
+    ```bash
+    oc logs -n music-streaming-app  -f $(oc get po -n music-streaming-app -l app=song -o custom-columns='Name:.metadata.name' --no-headers)
+    ```
+
+    Output
+
+    ```log
+    2023-06-16 06:44:43,071 INFO  [org.acm.son.app.SongResource] (executor-thread-1) song: 4fd7dfb4-9ac9-4d7c-b739-851e192b5337, Name: Uprising
+    ```
+    
+  - song-indexer-app log
+    
+    ```bash
+    oc logs -n music-streaming-app -f $(oc get po -o custom-columns='Name:.metadata.name' --no-headers -l app=song-indexer -n music-streaming-app)
+    ```
+    
+    Output
+
+    ```log
+    2023-06-16 06:44:44,103 INFO  [org.acm.son.ind.app.SongResource] (vert.x-eventloop-thread-0) Key: 4fd7dfb4-9ac9-4d7c-b739-851e192b5337, Payload: {"author":"Matt Bellamy","id":"4fd7dfb4-9ac9-4d7c-b739-851e192b5337","name":"Uprising","op":"ADD"}, Metadata: 2023-06-16T06:44:43.079Z
+    ```
+
+   
+## Observability
+### OpenTelemetry
+#### Install and configure Jager and OTEL
+- Install Red Hat OpenShift distributed tracing platform (Jaeger) and Red Hat OpenShift distributed tracing data collection (OTEL) Operators
+
+  ```bash
+  oc create -k kustomize/jaeger/operator/overlays/demo
+  oc create -k kustomize/opentelemetry/operator/overlays/demo
+  oc get csv -n openshift-distributed-tracing
+  ```
+
+  Output
+  
+  ```bash
+NAME                                 DISPLAY                                                 VERSION                REPLACES                                       PHASE
+jaeger-operator.v1.42.0-5            Red Hat OpenShift distributed tracing platform          1.42.0-5               jaeger-operator.v1.34.1-5                      Succeeded
+opentelemetry-operator.v0.74.0-5     Red Hat OpenShift distributed tracing data collection   0.74.0-5               opentelemetry-operator.v0.60.0-2               Succeeded
+  ```
+
+- Create Jaeger and OTEL instances
+  
+  ```bash
+  oc create -k kustomize/opentelemetry/instance/overlays/demo
+  oc create -k kustomize/jaeger/instance/overlays/demo
+  oc  -n app-monitor wait --for condition=ready --timeout=180s pod --all
+  ```
+
+  Output
+
+  ```bash
+  pod/jaeger-7bbbcf6bff-wpwp8 condition met
+  pod/otel-collector-746df75c54-82xq8 condition met
+  NAME                              READY   STATUS    RESTARTS   AGE
+  jaeger-7bbbcf6bff-wpwp8           2/2     Running   0          55s
+  otel-collector-746df75c54-82xq8   1/1     Running   0          3m25s
+  ```
+#### Deploy app with OTEL enabled
+
+- Deploy song app (producer) and song-indexer (consumer) app
+  
+  ```bash
+  oc apply -k kustomize/song-app/overlays/demo-otel
+  oc apply -k kustomize/song-indexer-app/overlays/demo-otel
+  oc -n music-streaming-app wait --for condition=ready --timeout=180s pod --all
+  oc get po -n music-streaming-app
+  ```
+  Output
+
+  ```bash
+  namespace/music-streaming-app unchanged
+  configmap/song-config-demo configured
+  service/song unchanged
+  deployment.apps/song configured
+  route.route.openshift.io/song unchanged
+  configmap/song-indexer-config-demo configured
+  service/song-indexer unchanged
+  deployment.apps/song-indexer configured
+  pod/song-69dcd64598-g48fz condition met
+  pod/song-indexer-6469fc7966-2jfqt condition met
+  NAME                            READY   STATUS    RESTARTS   AGE
+  song-69dcd64598-g48fz           1/1     Running   0          84s
+  song-indexer-6469fc7966-2jfqt   1/1     Running   0          81s
+  ```
+  
+- Test song app and check both song-app and song-indexer-app log again
+
+    ```bash
+    HOST=$(oc get route/song -n music-streaming-app -o jsonpath='{.spec.host}')
+    curl -X POST -v -H "Content-Type: application/json" -d '{"author":"Taitotsmit","name":"Hello Mama","op":"ADD"}' https://$HOST/songs
+    ```
+    
+    song-app log
+  
+    ```bash
+    oc logs -n music-streaming-app $(oc get po -o custom-columns='Name:.metadata.name' --no-headers -l app=song -n music-streaming-app)
+    ```
+
+    Output
+
+    ```bash
+    06:59:21 INFO  traceId=a63c9a35b536925f92732c422c7958c4, parentId=, spanId=faf98558be7e7ca2, sampled=true [or.ac.so.ap.SongResource] (executor-thread-1) song: cc85c576-49f3-4516-b6dc-7a1f03284098, Name: Hello Mama
+    ```
+
+    song-indexer-log
+
+    ```bash
+    oc logs -n music-streaming-app $(oc get po -o custom-columns='Name:.metadata.name' --no-headers -l app=song-indexer -n music-streaming-app)
+    ```
+
+    Output
+
+    ```bash
+    06:59:22 INFO  traceId=a63c9a35b536925f92732c422c7958c4, parentId=1e53955006c7aec8, spanId=961e4e275cb57a6e, sampled=true [or.ac.so.in.ap.SongResource] (vert.x-eventloop-thread-0) Key: cc85c576-49f3-4516-b6dc-7a1f03284098, Payload: {"author":"Taitotsmit","id":"cc85c576-49f3-4516-b6dc-7a1f03284098","name":"Hello Mama","op":"ADD"}, Metadata: 2023-06-16T06:59:21.798Z
+    ```
+
+    Notice: Trace ID (*traceId=a63c9a35b536925f92732c422c7958c4*) in song app and song-indexer app is the same
+
+#### Jaeger Console
+- Check Jaeger Console for tracing
+  - Open Jaeger Console in namespace app-monitor
+    
+    ![](images/app-monitor-namespace.png)
+
+    or check Jaeger's URL
+
+    ```bash
+    oc get route jaeger -n app-monitor -o jsonpath='{.spec.host}'
+    ```
+  
+  - Select service song-app 
+    
+    ![](images/jaeger-song-app.png)
+
+  - Select trace graph
+    
+    ![](images/jaeger-trace-graph.png)
+
+### Config user workload monitoring
 - Enable user workload monitoring on your OpenShift cluster
   
   ```bash
@@ -128,37 +353,51 @@
   
   ![](images/kafka-metrics-dev-console.png)
 
-## Grafana Dashboard
+### Grafana Dashboard
 
 - Install Grafana Operator
   
   ```bash
   oc create -k kustomize/grafana/operator/overlays/demo
-  oc get csv -n app-monitor
-  oc get po -n app-monitor
+  oc wait -n demo --for condition=established --timeout=180s \
+    crd/grafanadashboards.integreatly.org \
+    crd/grafanadatasources.integreatly.org
   ```
   Output
 
   ```bash
-  NAME                       DISPLAY            VERSION   REPLACES                   PHASE
-  grafana-operator.v4.10.1   Grafana Operator   4.10.1    grafana-operator.v4.10.0   Succeeded
-  NAME                                                  READY   STATUS    RESTARTS   AGE
-  grafana-operator-controller-manager-55c9b6c4d-kvq86   2/2     Running   0          85s
+  customresourcedefinition.apiextensions.k8s.io/grafanadashboards.integreatly.org condition met
+  customresourcedefinition.apiextensions.k8s.io/grafanadatasources.integreatly.org condition met
   ```
 
 - Create Gafana Instance
   
   ```bash
-  oc create -k kustomize/grafana/instance/overlays/demo
-  oc get po -n app-monitor
+  oc apply -k kustomize/grafana/instance/overlays/demo
+  oc -n app-monitor wait --for condition=ready \
+  --timeout=180s pod -l app=grafana
   ```
   Output
   
   ```bash
   grafana.integreatly.org/grafana created
-  NAME                                                  READY   STATUS    RESTARTS   AGE
-  grafana-deployment-6cf7948587-qrqp5                   1/1     Running   0          45s
-  grafana-operator-controller-manager-55c9b6c4d-72ckc   2/2     Running   0          2m2s
+  pod/grafana-deployment-7c6d8bc4bf-2hzh6 condition met
+  ```
+
+- Create Datasource
+
+  ```bash
+  oc adm policy add-cluster-role-to-user cluster-monitoring-view -z grafana-serviceaccount -n app-monitor
+  TOKEN=$(oc create token grafana-serviceaccount -n app-monitor)
+  cat grafana-dashboard/datasource.yaml| \
+  sed 's/Bearer .*/Bearer '"$TOKEN""'"'/'| \
+  oc apply -n app-monitor -f -
+  ```
+
+  Output
+
+  ```bash
+  grafanadatasource.integreatly.org/datasource created
   ```
 
 - Check of Grafana's route
@@ -167,163 +406,9 @@
   oc get route grafana-route -n app-monitor -o jsonpath='{.spec.host}'
   ```
 
-- Create dashboard
-
-  WIP
-
-## OpenTelemetry
-
-- Install Red Hat OpenShift distributed tracing platform (Jaeger) and Red Hat OpenShift distributed tracing data collection (OTEL) Operators
-
-  ```bash
-  oc create -k kustomize/jaeger/operator/overlays/demo
-  oc create -k kustomize/opentelemetry/operator/overlays/demo
-  oc get csv -n app-monitor
-  ```
-
-  Output
+- Import [Dashboard](grafana-dashboard)
   
-  ```bash
-  NAME                               DISPLAY                                                 VERSION    REPLACES                           PHASE
-  grafana-operator.v4.10.1           Grafana Operator                                        4.10.1     grafana-operator.v4.10.0           Succeeded
-  jaeger-operator.v1.42.0-5          Red Hat OpenShift distributed tracing platform          1.42.0-5   jaeger-operator.v1.34.1-5          Succeeded
-  opentelemetry-operator.v0.74.0-5   Red Hat OpenShift distributed tracing data collection   0.74.0-5   opentelemetry-operator.v0.60.0-2   Succeeded
-  ```
-
-- Create Jaeger and OTEL instances
-  
-  ```bash
-  oc create -k kustomize/opentelemetry/instance/overlays/demo
-  oc create -k kustomize/jaeger/instance/overlays/demo
-  oc get po -n app-monitor
-  ```
-
-  Output
-
-  ```bash
-  NAME                                                        READY   STATUS    RESTARTS   AGE
-  grafana-deployment-6cf7948587-qrqp5                         1/1     Running   0          21m
-  grafana-operator-controller-manager-55c9b6c4d-72ckc         2/2     Running   0          23m
-  jaeger-584789dc75-qbxgb                                     2/2     Running   0          12s
-  opentelemetry-operator-controller-manager-89f5dc665-8wtxb   2/2     Running   0          4m37s
-  otel-collector-746df75c54-w4rct                             1/1     Running   0          69s
-  ```
-
-## Demo Application
-
-- Deploy song app (producer) and song-indexer (consumer) app
-  
-  ```bash
-  oc apply -k kustomize/song-app/overlays/demo
-  oc apply -k kustomize/song-indexer-app/overlays/demo 
-  oc get po -n music-streaming-app
-  ```
-  
-  Output
-
-  ```bash
-  NAME                          READY   STATUS    RESTARTS   AGE
-  song-5ff767c66-r5zdx          1/1     Running   0          5m37s
-  song-indexer-7bbf8f9d-8gcds   1/1     Running   0          3m1s
-  ```
-  <!-- ```bash
-  KAFKA_BOOTSTRAP=kafka-demo-kafka-bootstrap.demo.svc:9092
-  OTEL_ENDPOINT=otel-collector-headless.app-monitor.svc:4317
-  cat song-app.yaml | \
-   sed 's/KAFKA_BOOTSTRAP/'$KAFKA_BOOTSTRAP'/' | \
-   sed 's/OTEL_ENDPOINT/'$OTEL_ENDPOINT'/' |
-   oc apply -f -
-  ``` -->
-
-- Check developer console
-  
-  ![](images/dev-console-song-app-topology.png)
-
-- Run following test scripts and check for both song app and song-indexer app
-  - Put a message to topic song
-    
-    ```bash
-    HOST=$(oc get route/song -n music-streaming-app -o jsonpath='{.spec.host}')
-    curl -X POST -v -H "Content-Type: application/json" -d '{"author":"Matt Bellamy","name":"Uprising","op":"ADD"}' https://$HOST/songs
-    ```
-
-    Output
-
-    ```bash
-    *  SSL certificate verify ok.
-    * using HTTP/1.x
-    > POST /songs HTTP/1.1
-    > Host: song-music-streaming-app.apps.cluster-2j5j5.2j5j5.sandbox1138.opentlc.com
-    > User-Agent: curl/8.1.2
-    > Accept: */*
-    > Content-Type: application/json
-    > Content-Length: 54
-    > 
-    * TLSv1.3 (IN), TLS handshake, Newsession Ticket (4):
-    * TLSv1.3 (IN), TLS handshake, Newsession Ticket (4):
-    * old SSL session ID is stale, removing
-    < HTTP/1.1 204 No Content
-    < set-cookie: 307fcbf9d775aa21dec85f890f2422aa=63f9ae3e47f4b946088c4346a8d36ff6; path=/; HttpOnly; Secure; SameSite=None
-    < 
-    * Connection #0 to host song-music-streaming-app.apps.cluster-2j5j5.2j5j5.sandbox1138.opentlc.com left intact
-    ```
-   
-  <!-- - Test script
-  
-    ```bash
-    HOST=$(oc get route/song -n song-app -o jsonpath='{.spec.host}')
-    MAX=100
-    CUR=0
-    DELAY_SEC=1
-    while [ $CUR  -lt $MAX ];
-    do
-      curl -X POST -H "Content-Type: application/json" -d '{"author":"Matt Bellamy","name":"Uprising","op":"ADD"}' http://$HOST/songs
-      sleep $DELAY_SEC
-      CUR=$(expr $CUR + 1)
-      echo "Count :$CUR"
-    done
-    ``` -->
-  - song log
-
-    ```bash
-    oc logs -n music-streaming-app -f $(oc get po -o custom-columns='Name:.metadata.name' --no-headers -l app=song -n music-streaming-app)
-    ```
-
-    Output
-
-    ```log
-    05:41:28 INFO  traceId=b898c864222f761fa2e8884bd7fb01d5, parentId=, spanId=d638bff583181f47, sampled=true [or.ac.so.ap.SongResource] (executor-thread-1) song: fa85c0cb-1e7b-4206-826f-5253132266ef, Name: Uprising
-    ```
-    
-  - song-indexer log
-    
-    ```bash
-    oc logs -n music-streaming-app -f $(oc get po -o custom-columns='Name:.metadata.name' --no-headers -l app=song-indexer -n music-streaming-app)
-    ```
-    
-    Output
-
-    ```log
-    05:41:31 INFO  traceId=b898c864222f761fa2e8884bd7fb01d5, parentId=5914e681e09bf49f, spanId=3cc11f7a0d77bf49, sampled=true [or.ac.so.in.ap.SongResource] (vert.x-eventloop-thread-0) Key: fa85c0cb-1e7b-4206-826f-5253132266ef, Payload: {"author":"Matt Bellamy","id":"fa85c0cb-1e7b-4206-826f-5253132266ef","name":"Uprising","op":"ADD"}, Metadata: 2023-06-16T05:41:29.873Z
-    ```
-
-    Check that Trace ID (*traceId=b898c864222f761fa2e8884bd7fb01d5*) in song app and song-indexer app is the same
-
-- Check Jaeger Console for tracing
-  - Open Jaeger Console in namespace app-monitor
-    
-    ![](images/app-monitor-namespace.png)
-  
-  - Select service song-app 
-    
-    ![](images/jaeger-song-app.png)
-
-  - Select trace graph
-    
-    ![](images/jaeger-trace-graph.png)
-
-
-## Kafka Connect
+## Kafka Connect MongoDB
 
 - Install MongoDB
   
@@ -333,7 +418,7 @@
   helm install mongodb bitnami/mongodb --set podSecurityContext.fsGroup="",containerSecurityContext.enabled=false,podSecurityContext.enabled=false,auth.enabled=false --version 13.6.0 -n song-app
   ```
 
-- Create secret for image registry if you want to use external container registry
+<!-- - Create secret for image registry if you want to use external container registry
   
     For podman
 
@@ -349,7 +434,7 @@
     oc create secret generic quayio \
     --from-file=.dockerconfigjson=$HOME/.docker/config.json \
     --type=kubernetes.io/dockerconfigjson -n demo
-    ```
+    ``` -->
 
 - Create config map for connect metrics
 

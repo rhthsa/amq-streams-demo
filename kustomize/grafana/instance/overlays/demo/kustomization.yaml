@@ -4,3 +4,4 @@ kind: Kustomization
 namespace: app-monitor
 resources:
   - ../../base
+  - cluster-monitor-view.yaml

@@ -18,7 +18,7 @@ patches:
   - patch: |-
       - op: replace
         path: /spec/template/spec/containers/0/image
-        value: quay.io/voravitl/song-indexer:native
+        value: quay.io/voravitl/song-indexer:native-otel
     target:
       kind: Deployment
       name: song-indexer
