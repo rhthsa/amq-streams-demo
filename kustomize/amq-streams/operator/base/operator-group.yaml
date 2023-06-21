@@ -2,8 +2,8 @@ apiVersion: operators.coreos.com/v1
 kind: OperatorGroup
 metadata:
   name: amq-streams-operator
-  namespace: amq-streams
+  namespace: openshift-operators
 spec:
   targetNamespaces:
-  - amq-streams
+  - openshift-operators
 ---
