@@ -1,0 +1,24 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: amq-streams-demo
+  namespace: openshift-gitops
+spec:
+  destination:
+    name: ''
+    namespace: demo
+    server: 'https://kubernetes.default.svc'
+  source:
+    path: kustomize/amq-streams/instance/overlays/demo
+    repoURL: 'https://github.com/rhthsa/amq-streams-demo'
+    targetRevision: HEAD
+  project: default
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+      - Validate=false
+      - ApplyOutOfSyncOnly=true
+

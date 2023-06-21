@@ -11,6 +11,10 @@
     - [Config user workload monitoring](#config-user-workload-monitoring)
     - [Grafana Dashboard](#grafana-dashboard)
   - [Kafka Connect MongoDB](#kafka-connect-mongodb)
+  - [GitOps - ArgoCD](#gitops---argocd)
+    - [GitOps Operator](#gitops-operator)
+    - [AMQ Streams](#amq-streams)
+    - [Demo App](#demo-app)
 
 ## Install AMQ Streams Operators
 - Install AMQ Streams Operator
@@ -520,4 +524,140 @@ opentelemetry-operator.v0.74.0-5     Red Hat OpenShift distributed tracing data 
 
     ![](images/kafka-connect-trace-graph.png)
 
-<!-- oc run --namespace kafka mongodb-client --rm --tty -i --restart='Never' --image docker.io/bitnami/mongodb:4.4.13-debian-10-r9 --command -- bash -->
+## GitOps - ArgoCD
+### GitOps Operator
+
+- Install *Red Hat OpenShift GitOps* Operator
+  
+  ```bash
+  oc create -k kustomize/gitops/operator/overlays/demo
+  oc wait -n openshift-operators --timeout=180s --for=jsonpath='{.status.phase}'=Succeeded csv --all
+  oc get pods -n openshift-gitops
+  ```
+  Output
+  
+  ```bash
+  NAME                                                          READY   STATUS    RESTARTS   AGE
+  cluster-8548b895cc-8x6gb                                      1/1     Running   0          8m44s
+  kam-55d4bf4647-xxqtr                                          1/1     Running   0          8m44s
+  openshift-gitops-application-controller-0                     1/1     Running   0          8m43s
+  openshift-gitops-applicationset-controller-54cd79848f-svtkf   1/1     Running   0          8m43s
+  openshift-gitops-dex-server-694b6cdb4c-stww2                  1/1     Running   0          8m43s
+  openshift-gitops-redis-688b9fd88f-hth5b                       1/1     Running   0          8m43s
+  openshift-gitops-repo-server-56759b7b95-qtz66                 1/1     Running   0          8m43s
+  openshift-gitops-server-56d7468bf-zz4fl                       1/1     Running   0          8m43s
+  ```
+
+- ArgoCD Console and default admin password
+  
+  ```bash
+  ARGOCD=$(oc get route/openshift-gitops-server -n openshift-gitops -o jsonpath='{.spec.host}')
+  echo https://$ARGOCD
+  PASSWORD=$(oc extract secret/openshift-gitops-cluster -n openshift-gitops --to=-) 2>/dev/null
+  echo "User: admin"
+  echo "Password: "$PASSWORD
+  ```
+
+### AMQ Streams
+- Create AMQ Streams cluster
+  
+  ```bash
+  oc apply -f argocd/amq-streams-operator.yaml  -n openshift-gitops
+  oc apply -f argocd/amq-streams-demo.yaml  -n openshift-gitops
+  cat argocd/add-role-admin.yaml|sed 's/NAMESPACE/demo/' \
+  | oc apply -f -
+  ```
+
+- Check for ArgoCD application status
+  
+  ```bash
+    oc describe application/amq-streams-demo \
+    -n openshift-gitops |  grep -A10 "Events:"
+  ```
+
+  Output
+  
+  ```bash
+  Events:
+    Type    Reason              Age    From                           Message
+    ----    ------              ----   ----                           -------
+    Normal  OperationStarted    3m24s  argocd-application-controller  Initiated automated sync to '021360844236e9942ee1d0f2ae8abcf56876029d'
+    Normal  ResourceUpdated     3m24s  argocd-application-controller  Updated sync status:  -> OutOfSync
+    Normal  ResourceUpdated     3m24s  argocd-application-controller  Updated health status:  -> Healthy
+    Normal  ResourceUpdated     3m24s  argocd-application-controller  Updated sync status: OutOfSync -> Synced
+    Normal  ResourceUpdated     3m24s  argocd-application-controller  Updated sync status: OutOfSync -> Synced
+    Normal  ResourceUpdated     3m20s  argocd-application-controller  Updated sync status: Synced -> OutOfSync
+    Normal  ResourceUpdated     2m50s  argocd-application-controller  Updated sync status: OutOfSync -> Synced
+    Normal  ResourceUpdated     2m50s  argocd-application-controller  Updated sync status: OutOfSync -> Synced
+  ```
+
+- ArcoCD Console
+  
+
+### Demo App
+
+- Create Music Streming App
+  
+  ```bash
+  oc apply -f argocd/music-streaming-song-app.yaml -n openshift-gitops
+  oc apply -f argocd/music-streaming-song-indexer-app.yaml -n openshift-gitops
+  cat argocd/add-role-admin.yaml|sed 's/NAMESPACE/music-streaming-app/' \
+  | oc apply -f -
+  ```
+
+  Output
+
+  ```bash
+  application.argoproj.io/music-streaming-song-app created
+  application.argoproj.io/music-streaming-song-indexer-app created
+  ```
+
+- Check for ArgoCD application status
+  
+  - song-app
+  
+    ```bash
+    oc describe application/music-streaming-song-app \
+    -n openshift-gitops |  grep -A10 "Events:"
+    ```
+
+    Output
+
+    ```bash
+    Events:
+      Type    Reason            Age   From                           Message
+      ----    ------            ----  ----                           -------
+      Normal  OperationStarted  48s   argocd-application-controller  Initiated automated sync to '021360844236e9942ee1d0f2ae8abcf56876029d'
+      Normal  ResourceUpdated   48s   argocd-application-controller  Updated sync status:  -> OutOfSync
+      Normal  ResourceUpdated   48s   argocd-application-controller  Updated health status:  -> Healthy
+      Normal  ResourceUpdated   48s   argocd-application-controller  Updated sync status:  -> OutOfSync
+      Normal  ResourceUpdated   48s   argocd-application-controller  Updated health status:  -> Healthy
+      Normal  ResourceUpdated   47s   argocd-application-controller  Updated sync status: OutOfSync -> Synced
+      Normal  ResourceUpdated   47s   argocd-application-controller  Updated sync status: OutOfSync -> Synced
+    ```
+
+    ArgoCD Console
+
+    ![](images/argocd-song-app.png)
+
+  - song-indexer-app
+  
+    ```bash
+    oc describe application/music-streaming-song-indexer-app \
+    -n openshift-gitops | grep -A10 "Events:"
+    ```
+
+    Output
+
+    ```bash
+    Events:
+    Type    Reason           Age   From                           Message
+    ----    ------           ----  ----                           -------
+    Normal  ResourceUpdated  3m4s  argocd-application-controller  Updated sync status:  -> Synced
+    Normal  ResourceUpdated  3m4s  argocd-application-controller  Updated health status:  -> Healthy
+    ```
+
+    ArgoCD Console
+
+    ![](images/argocd-song-indexer-app.png)
+  

@@ -1,0 +1,22 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: music-streaming-song-indexer-app
+  namespace: openshift-gitops
+spec:
+  destination:
+    name: ''
+    namespace: music-streaming-app
+    server: 'https://kubernetes.default.svc'
+  source:
+    path: kustomize/song-indexer-app/overlays/demo
+    repoURL: 'https://github.com/rhthsa/amq-streams-demo'
+    targetRevision: HEAD
+  project: default
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ApplyOutOfSyncOnly=true
