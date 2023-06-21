@@ -3,7 +3,16 @@ kind: Jaeger
 metadata:
   name: jaeger
 spec:
-  strategy: allInOne
+  strategy: allinone
+  # allInOne:
+  #   options:
+  #     log-level: info
+  #     query:
+  #       base-path: /jaeger
+  #     prometheus:
+  #       server-url: "http://prometheus:9090"
+  #   metricsStorage:
+  #     type: prometheus
   storage:
     options:
       memory:
