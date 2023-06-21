@@ -1,0 +1,22 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: otel-demo
+  namespace: openshift-gitops
+spec:
+  destination:
+    name: ''
+    namespace: app-monitor
+    server: 'https://kubernetes.default.svc'
+  source:
+    path: kustomize/opentelemetry/instance/overlays/demo
+    repoURL: 'https://github.com/rhthsa/amq-streams-demo'
+    targetRevision: HEAD
+  project: default
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ApplyOutOfSyncOnly=true

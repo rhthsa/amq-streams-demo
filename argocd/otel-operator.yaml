@@ -1,0 +1,22 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: otel-operator
+  namespace: openshift-gitops
+spec:
+  destination:
+    name: ''
+    namespace: openshift-operators
+    server: 'https://kubernetes.default.svc'
+  source:
+    path: kustomize/opentelemetry/operator/overlays/demo
+    repoURL: 'https://github.com/rhthsa/amq-streams-demo'
+    targetRevision: HEAD
+  project: default
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+      - ApplyOutOfSyncOnly=true

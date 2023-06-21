@@ -15,6 +15,7 @@
     - [GitOps Operator](#gitops-operator)
     - [AMQ Streams](#amq-streams)
     - [Demo App](#demo-app)
+    - [Observability](#observability-1)
 
 ## Install AMQ Streams Operators
 - Install AMQ Streams Operator
@@ -587,7 +588,21 @@ opentelemetry-operator.v0.74.0-5     Red Hat OpenShift distributed tracing data 
 
 - ArcoCD Console
   
+  - Application amq-streams-operator
+    
+    ![](images/amq-streams-operator-application.png)
 
+    Status
+
+    ![](images/amq-streams-operator-application-detailed.png)
+
+  - Application amq-streams-demo
+
+    ![](images/amq-streams-demo-application.png)
+
+    Status
+
+    ![](images/amq-streams-demo-application-detailed.png)
 ### Demo App
 
 - Create Music Streming App
@@ -655,3 +670,33 @@ opentelemetry-operator.v0.74.0-5     Red Hat OpenShift distributed tracing data 
 
     ![](images/argocd-song-indexer-app.png)
   
+### Observability
+- Install Jaeger Operator and OTEL Operator
+
+  ```bash
+  oc create -f argocd/jaeger-operator.yaml 
+  oc create -f argocd/otel-operator.yaml 
+  ```
+
+- Create OTEL instance on namesapce app-monitor
+  
+  ```bash
+  oc create -f argocd/jaeger-demo.yaml 
+  oc create -f argocd/otel-demo.yaml 
+  cat argocd/add-role-admin.yaml|sed 's/NAMESPACE/app-monitor/' \
+  | oc apply -f -
+  ```
+- Update song app and song indexer app to OTEL version
+  
+  ```bash
+  oc patch application/music-streaming-song-app \
+  -p '{"spec":{"source":{"path":"kustomize/song-app/overlays/demo-otel"}}}' --type='merge'\
+  -n openshift-gitops
+  oc patch application/music-streaming-song-indexer-app \
+  -p '{"spec":{"source":{"path":"kustomize/song-indexer-app/overlays/demo-otel"}}}' --type='merge'\
+  -n openshift-gitops
+  ```
+
+  Check ArgoCD that applications are updating
+
+  ![](images/music-streaming-song-indexer-app-updating.png)
