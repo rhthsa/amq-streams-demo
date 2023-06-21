@@ -21,18 +21,17 @@
   
   ```bash
   oc apply -k kustomize/amq-streams/operator/overlays/demo
-  oc wait -n demo --timeout=180s --for=jsonpath='{.status.phase}'=Succeeded csv --all
-  oc wait -n demo --for condition=established --timeout=180s \
+  oc wait -n openshift-operators --timeout=180s --for=jsonpath='{.status.phase}'=Succeeded csv --all
+  oc wait -n openshift-operators --for condition=established --timeout=180s \
     crd/kafkas.kafka.strimzi.io \
     crd/kafkatopics.kafka.strimzi.io \
     crd/strimzipodsets.core.strimzi.io
-  oc get csv -n demo
+  oc get csv -n openshift-operators
   ```
 
   Output
 
   ```bash
-  namespace/demo created
   operatorgroup.operators.coreos.com/amq-streams-operator created
   subscription.operators.coreos.com/amq-streams created
   clusterserviceversion.operators.coreos.com/amqstreams.v2.4.0-0 condition met
@@ -50,25 +49,20 @@
   oc apply -k kustomize/amq-streams/instance/overlays/demo
   oc -n demo wait --for condition=ready \
      --timeout=180s pod -l  app.kubernetes.io/instance=kafka-demo
-  oc -n demo wait --for condition=ready \
-  --timeout=180s pod  -l rht.subcomp=kafka-broker
   oc get strimzipodsets -n demo
   ```
 
   Output
 
   ```bash
-  pod/kafka-demo-entity-operator-5fc5595685-nf8fz condition met
+  pod/kafka-demo-entity-operator-5fc5595685-fxkvp condition met
   pod/kafka-demo-kafka-0 condition met
   pod/kafka-demo-kafka-1 condition met
   pod/kafka-demo-kafka-2 condition met
-  pod/kafka-demo-kafka-exporter-d65ffddd8-wjcfk condition met
+  pod/kafka-demo-kafka-exporter-d65ffddd8-dwtpb condition met
   pod/kafka-demo-zookeeper-0 condition met
   pod/kafka-demo-zookeeper-1 condition met
   pod/kafka-demo-zookeeper-2 condition met
-  pod/kafka-demo-kafka-0 condition met
-  pod/kafka-demo-kafka-1 condition met
-  pod/kafka-demo-kafka-2 condition met
   NAME                   PODS   READY PODS   CURRENT PODS   AGE
   kafka-demo-kafka       3      3            3              57s
   kafka-demo-zookeeper   3      3            3              102
