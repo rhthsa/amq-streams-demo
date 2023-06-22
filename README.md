@@ -10,6 +10,7 @@
       - [Jaeger Console](#jaeger-console)
     - [Config user workload monitoring](#config-user-workload-monitoring)
     - [Grafana Dashboard](#grafana-dashboard)
+  - [Camel-K](#camel-k)
   - [Kafka Connect MongoDB](#kafka-connect-mongodb)
   - [GitOps - ArgoCD](#gitops---argocd)
     - [GitOps Operator](#gitops-operator)
@@ -406,7 +407,14 @@ opentelemetry-operator.v0.74.0-5     Red Hat OpenShift distributed tracing data 
   ```
 
 - Import [Dashboard](grafana-dashboard)
+
+## Camel-K
+- Install Camel-K Operator
   
+  ```bash
+  oc create -k kustomize/camel-k/operator/overlays/demo
+  ```
+- Install Serverless Operator
 ## Kafka Connect MongoDB
 
 - Install MongoDB
