@@ -1,10 +1,9 @@
-# https://github.com/strimzi/strimzi-kafka-operator/tree/main
----
 apiVersion: kafka.strimzi.io/v1beta2
 kind: Kafka
 metadata:
   name: kafka-demo
   labels:
+    app.kubernetes.io/instance: amq-streams-demo
     strimzi.io/cluster: kafka-demo
   annotations:
     argocd.argoproj.io/hook: Sync
