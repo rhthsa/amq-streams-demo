@@ -4,7 +4,7 @@ kind: Kustomization
 namespace: demo
 resources:
   - ../../base
-  - songs-topic.yaml
+  # - songs-topic.yaml
 patches:
   - patch: |-
       - op: replace
@@ -12,7 +12,7 @@ patches:
         value: '10Gi'
       - op: replace
         path: /spec/kafka/storage/size
-        value: '10Gi'
+        value: '12Gi'
     target:
       group: kafka.strimzi.io
       kind: Kafka
