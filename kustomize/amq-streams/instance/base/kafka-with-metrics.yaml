@@ -9,9 +9,6 @@ metadata:
     argocd.argoproj.io/hook: Sync
     argocd.argoproj.io/sync-wave: "100"
 spec:
-  entityOperator:
-    topicOperator: {}
-    userOperator: {}
   kafka:
     config:
       offsets.topic.replication.factor: 3
@@ -48,12 +45,15 @@ spec:
         tls: true
     version: 3.4.0
     replicas: 3
-  metricsConfig:
-    type: jmxPrometheusExporter
-    valueFrom:
-      configMapKeyRef:
-        name: kafka-metrics
-        key: cruise-control-metrics-config.yaml
+  entityOperator:
+    topicOperator: {}
+    userOperator: {}
+    # metricsConfig:
+    #   type: jmxPrometheusExporter
+    #   valueFrom:
+    #     configMapKeyRef:
+    #       name: kafka-metrics
+    #       key: cruise-control-metrics-config.yaml
   zookeeper:
     readinessProbe:
       failureThreshold: 3
