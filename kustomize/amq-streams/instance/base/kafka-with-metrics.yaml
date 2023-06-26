@@ -17,7 +17,7 @@ spec:
       transaction.state.log.min.isr: 2
       default.replication.factor: 3
       min.insync.replicas: 2
-      inter.broker.protocol.version: '3.4'
+      inter.broker.protocol.version: 3.4.0
     jmxOptions:
       authentication:
         type: password
