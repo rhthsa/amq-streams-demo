@@ -8,6 +8,7 @@ metadata:
   annotations:
     argocd.argoproj.io/hook: Sync
     argocd.argoproj.io/sync-wave: "200"
+    argocd.argoproj.io/compare-options: IgnoreExtraneous
 spec:
   config:
     retention.ms: 604800000
