@@ -12,7 +12,7 @@ patches:
         value: '10Gi'
       - op: replace
         path: /spec/kafka/storage/size
-        value: '25Gi'
+        value: '30Gi'
     target:
       group: kafka.strimzi.io
       kind: Kafka
